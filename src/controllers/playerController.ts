@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { pinJson, gatewayUrl } from '../services/ipfs';
 import { getEvents } from '../services/indexer';
 import { invalidatePlayerCache } from '../services/cache';
-import { ApiResponse } from '../types';
+import { ApiResponse, ProgressLevel } from '../types';
+import { getTierMeta } from '../utils/tier';
 
 export const registerSchema = z.object({
   wallet: z.string().min(56).max(56),
