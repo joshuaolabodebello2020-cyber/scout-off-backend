@@ -31,10 +31,13 @@ const config = {
     xFrameOptions: process.env.SECURITY_X_FRAME_OPTIONS ?? 'DENY',
     referrerPolicy: process.env.SECURITY_REFERRER_POLICY ?? 'no-referrer',
   },
+  // CORS configuration: comma-separated origins in ALLOWED_ORIGINS env var
+  allowedOrigins: (process.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim()).filter(Boolean),
   webhook: {
     enabled: process.env.WEBHOOK_ENABLED === 'true',
     url: process.env.WEBHOOK_URL ?? ''
   },
+
 };
 
 export default config;

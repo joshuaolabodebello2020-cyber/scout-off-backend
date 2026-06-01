@@ -14,7 +14,24 @@ import { stellarHealth } from './services/stellar';
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = Array.isArray(config.allowedOrigins) ? config.allowedOrigins : [];
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow server-to-server or tools with no origin header
+    if (!origin) return callback(null, true);
+    // If no origins configured, deny cross-origin browser requests
+    if (allowedOrigins.length === 0) return callback(null, false);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+// Ensure preflight requests are handled for all routes
+app.options('*', cors(corsOptions));
 app.use(securityHeaders);
 app.use(express.json());
 
