@@ -401,6 +401,18 @@ Currently checks: **IPFS (Pinata)** storage connectivity.
 
 Both dependency checks are stubbed in tests — see `tests/routes/health.test.ts`.
 
+### IPFS Service Dependency
+
+The backend uses [Pinata](https://pinata.cloud) to pin player metadata and milestone evidence to IPFS. The service is **optional in local development** — when `PINATA_API_KEY` and `PINATA_SECRET` are not set, `pinJson`, `pinFile`, and `checkHealth` fall back to deterministic stub behaviour and log a `[warn]` on each call. No network requests are made.
+
+In **production** (`NODE_ENV=production`) the same functions throw immediately if the credentials are absent, preventing silent data loss.
+
+| Env var | Required | Description |
+|---------|----------|-------------|
+| `PINATA_API_KEY` | production only | Pinata API key |
+| `PINATA_SECRET` | production only | Pinata secret key |
+| `PINATA_GATEWAY` | no | Public gateway base URL (default: `https://gateway.pinata.cloud`) |
+
 ## How It Works
 
 1. **Player Onboarding**

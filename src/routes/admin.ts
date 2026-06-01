@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { getStats, getAllEvents, getFeeSummary, registerValidator, revokeValidator } from '../controllers/adminController';
+import { getStats, getAllEvents, getFeeSummary, registerValidator, revokeValidator, pauseContract, unpauseContract } from '../controllers/adminController';
+import { introspectToken } from '../controllers/adminController';
 import { requireAuth, requireRole } from '../middleware/auth';
 
 const router = Router();
@@ -63,6 +64,32 @@ router.post('/validators/register', requireRole('admin'), registerValidator);
  * @auth Bearer (admin role required)
  */
 router.post('/validators/revoke', requireRole('admin'), revokeValidator);
+
+/**
+ * POST /api/admin/contract/pause
+ *
+ * Stub endpoint that simulates pausing the Soroban smart contract.
+ * Contract-level behavior is simulated — no real on-chain transaction is issued.
+ *
+ * @response 202 { success: true, message: string, transactionId: string }
+ * @response 401 { success: false, error: string } - Missing token
+ * @response 403 { success: false, error: string } - Non-admin role
+ * @auth Bearer (admin role required)
+ */
+router.post('/contract/pause', requireRole('admin'), pauseContract);
+
+/**
+ * POST /api/admin/contract/unpause
+ *
+ * Stub endpoint that simulates unpausing the Soroban smart contract.
+ * Contract-level behavior is simulated — no real on-chain transaction is issued.
+ *
+ * @response 202 { success: true, message: string, transactionId: string }
+ * @response 401 { success: false, error: string } - Missing token
+ * @response 403 { success: false, error: string } - Non-admin role
+ * @auth Bearer (admin role required)
+ */
+router.post('/contract/unpause', requireRole('admin'), unpauseContract);
 
 /**
  * POST /api/admin/introspect

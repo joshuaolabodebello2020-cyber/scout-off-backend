@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
 import { getEvents } from '../services/indexer';
 import { AdminEvent, FeeHistoryItem, ApiResponse } from '../types';
+import { logAuditEvent } from '../services/audit';
 import config from '../config';
 
 const STELLAR_ADDRESS_RE = /^G[A-Z2-7]{55}$/;
@@ -93,6 +95,44 @@ export async function revokeValidator(req: Request, res: Response, next: NextFun
     console.info(`[admin] action=revoke_validator admin=${adminWallet} target=${validatorWallet}`);
     // TODO: invoke revoke_validator on Soroban contract
     res.status(202).json({ success: true, message: `Validator ${validatorWallet} revocation submitted` });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/admin/contract/pause
+ * Stub: signals intent to pause the Soroban contract. Contract-level behavior is simulated.
+ */
+export async function pauseContract(req: Request, res: Response, next: NextFunction) {
+  try {
+    const adminWallet = (req as any).account as string;
+    console.info(`[admin] action=pause_contract admin=${adminWallet}`);
+    // NOTE: Contract-level pause is simulated. Real invocation will call pause() on the Soroban contract.
+    res.status(202).json({
+      success: true,
+      message: 'Contract pause submitted (simulated)',
+      transactionId: 'stub-pause-txn-placeholder',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/admin/contract/unpause
+ * Stub: signals intent to unpause the Soroban contract. Contract-level behavior is simulated.
+ */
+export async function unpauseContract(req: Request, res: Response, next: NextFunction) {
+  try {
+    const adminWallet = (req as any).account as string;
+    console.info(`[admin] action=unpause_contract admin=${adminWallet}`);
+    // NOTE: Contract-level unpause is simulated. Real invocation will call unpause() on the Soroban contract.
+    res.status(202).json({
+      success: true,
+      message: 'Contract unpause submitted (simulated)',
+      transactionId: 'stub-unpause-txn-placeholder',
+    });
   } catch (err) {
     next(err);
   }
