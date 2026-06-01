@@ -12,7 +12,11 @@ import { validateBody, validateQuery } from '../middleware/validate';
 const router = Router();
 
 router.get('/', validateQuery(filterSchema), filterPlayers);
-router.post('/register', validateBody(registerSchema), registerPlayer);
+router.post(
+  '/register',
+  validateBody(registerSchema, { context: 'player_registration' }),
+  registerPlayer
+);
 router.get('/:playerId', getPlayer);
 router.get('/:playerId/milestones', getPlayerMilestones);
 
