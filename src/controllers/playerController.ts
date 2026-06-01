@@ -1,5 +1,4 @@
 import { sanitizeInput } from '../utils/sanitizer';
-import { sanitizeInput } from '../utils/sanitizer';
 import { z } from 'zod';
 import { pinJson, gatewayUrl } from '../services/ipfs';
 import { getEvents } from '../services/indexer';
@@ -64,7 +63,12 @@ export async function getPlayer(req: Request, res: Response, next: NextFunction)
 /** GET /api/players?region=&position=&minTier= */
 export async function filterPlayers(req: Request, res: Response, next: NextFunction) {
   try {
-    const { region, position, minTier, page, pageSize } = filterSchema.parse(req.query);
+    const tierResult = validateMinTier(req.query.minTier);
+    if (!tierResult.valid) {
+      res.status(400).json({ success: false, error: tierResult.error });
+      return;
+    }
+    const { region, position, page, pageSize } = filterSchema.parse(req.query);
     const sanitizedRegion = region ? sanitizeInput(region) : undefined;
     const sanitizedPosition = position ? sanitizeInput(position) : undefined;
     let players = getEvents('player_registered').map((e) => e.payload);
