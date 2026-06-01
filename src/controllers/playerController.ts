@@ -1,10 +1,10 @@
 import { sanitizeInput } from '../utils/sanitizer';
-import { sanitizeInput } from '../utils/sanitizer';
 import { z } from 'zod';
 import { pinJson, gatewayUrl } from '../services/ipfs';
 import { getEvents } from '../services/indexer';
 import { invalidatePlayerCache } from '../services/cache';
 import { ApiResponse } from '../types';
+import { validateMinTier } from '../utils/minTierValidator';
 
 export const registerSchema = z.object({
   wallet: z.string().min(56).max(56),
@@ -63,14 +63,19 @@ export async function getPlayer(req: Request, res: Response, next: NextFunction)
 /** GET /api/players?region=&position=&minTier= */
 export async function filterPlayers(req: Request, res: Response, next: NextFunction) {
   try {
-    const { region, position, minTier, page, pageSize } = filterSchema.parse(req.query);
+    const tierResult = validateMinTier(req.query.minTier);
+    if (!tierResult.valid) {
+      res.status(400).json({ success: false, error: tierResult.error });
+      return;
+    }
+    const { region, position, page, pageSize } = filterSchema.parse(req.query);
     const sanitizedRegion = region ? sanitizeInput(region) : undefined;
     const sanitizedPosition = position ? sanitizeInput(position) : undefined;
     let players = getEvents('player_registered').map((e) => e.payload);
     if (sanitizedRegion) players = players.filter((p) => p.region === sanitizedRegion);
     if (sanitizedPosition) players = players.filter((p) => p.position === sanitizedPosition);
-    if (minTier !== undefined)
-      players = players.filter((p) => Number(p.progress_level) >= minTier);
+    if (tierResult.tier !== undefined)
+      players = players.filter((p) => Number(p.progress_level) >= tierResult.tier!);
     const paginated = players.slice((page - 1) * pageSize, page * pageSize);
     res.json({ success: true, data: paginated, total: players.length, page, pageSize });
   } catch (err) {
