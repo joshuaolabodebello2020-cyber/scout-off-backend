@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { pinJson } from '../services/ipfs';
 import { getEvents } from '../services/indexer';
 import { invalidateMilestoneCache } from '../services/cache';
-import { logger } from '../utils/logger';
 import { PlayerMilestone } from '../types';
 
 export const milestoneSchema = z.object({

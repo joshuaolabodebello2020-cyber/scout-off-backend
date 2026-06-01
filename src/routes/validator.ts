@@ -7,20 +7,16 @@ import {
 } from '../controllers/validatorController';
 import { requireRole } from '../middleware/auth';
 import { validateBody, validateQuery } from '../middleware/validate';
+import { rateLimit } from '../middleware/rateLimit';
 
 const router = Router();
 
-router.post(
-  '/milestone',
-  requireRole('validator'),
-  validateBody(milestoneSchema, { context: 'validator_milestone_submission' }),
-  submitMilestoneEvidence
-);
-router.get(
-  '/milestones/pending',
-  requireRole('validator'),
-  validateQuery(pendingQuerySchema, { context: 'validator_pending_milestones' }),
-  getPendingMilestones
-);
+const milestoneRateLimit = rateLimit({
+  windowMs: Number(process.env.MILESTONE_RATE_WINDOW_MS) || 60_000,
+  max: Number(process.env.MILESTONE_RATE_MAX) || 10,
+});
+
+router.post('/milestone', milestoneRateLimit, requireRole('validator'), validateBody(milestoneSchema), submitMilestoneEvidence);
+router.get('/milestones/pending', requireRole('validator'), validateQuery(pendingQuerySchema), getPendingMilestones);
 
 export default router;

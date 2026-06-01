@@ -1,14 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
 import { sanitizeInput } from '../utils/sanitizer';
 import { z } from 'zod';
 import { pinJson, gatewayUrl } from '../services/ipfs';
 import { getEvents } from '../services/indexer';
 import { invalidatePlayerCache } from '../services/cache';
-import { dispatchEventWebhook } from '../services/webhooks';
-import { getTierMeta } from '../utils/tier';
 import { ApiResponse, ProgressLevel } from '../types';
-
-const CID_REGEX = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
+import { getTierMeta } from '../utils/tier';
 
 const baseRegistrationSchema = z.object({
   wallet: z.string().min(56).max(56),
@@ -91,7 +87,12 @@ export async function getPlayer(req: Request, res: Response, next: NextFunction)
 /** GET /api/players?region=&position=&minTier= */
 export async function filterPlayers(req: Request, res: Response, next: NextFunction) {
   try {
-    const { region, position, minTier, page, pageSize } = filterSchema.parse(req.query);
+    const tierResult = validateMinTier(req.query.minTier);
+    if (!tierResult.valid) {
+      res.status(400).json({ success: false, error: tierResult.error });
+      return;
+    }
+    const { region, position, page, pageSize } = filterSchema.parse(req.query);
     const sanitizedRegion = region ? sanitizeInput(region) : undefined;
     const sanitizedPosition = position ? sanitizeInput(position) : undefined;
     let players = getEvents('player_registered').map((e) => e.payload);
@@ -99,8 +100,30 @@ export async function filterPlayers(req: Request, res: Response, next: NextFunct
     if (sanitizedPosition) players = players.filter((p) => p.position === sanitizedPosition);
     if (minTier !== undefined)
       players = players.filter((p) => Number(p.progress_level) >= minTier);
+    const total = players.length;
+    const pages = Math.ceil(total / pageSize);
     const paginated = players.slice((page - 1) * pageSize, page * pageSize);
-    res.json({ success: true, data: paginated, total: players.length, page, pageSize });
+    res.json({ success: true, data: paginated, total, page, pageSize, pages });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PUT /api/players/:playerId
+ * Required permissions: caller must be the profile owner (JWT sub === playerId).
+ * Stub — returns 202 Accepted until on-chain update is wired.
+ */
+export const updatePlayerSchema = z.object({
+  position: z.string().min(1).optional(),
+  region: z.string().min(1).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export async function updatePlayer(req: Request, res: Response, next: NextFunction) {
+  try {
+    updatePlayerSchema.parse(req.body);
+    res.status(202).json({ success: true, message: 'Profile update accepted' });
   } catch (err) {
     next(err);
   }
