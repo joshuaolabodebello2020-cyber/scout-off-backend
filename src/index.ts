@@ -8,14 +8,18 @@ import validatorRoutes from './routes/validator';
 import adminRoutes from './routes/admin';
 import { errorHandler } from './middleware/errorHandler';
 import { securityHeaders } from './middleware/securityHeaders';
+import { correlationId } from './middleware/correlationId';
 import { indexEvents } from './services/indexer';
 import { logger } from './utils/logger';
 import { stellarHealth } from './services/stellar';
+import { checkHealth } from './services/ipfs';
 
 const app = express();
 
 app.use(cors());
+app.use(correlationId);
 app.use(securityHeaders);
+app.use(responseTime);
 app.use(express.json());
 
 app.get('/health', async (_req, res) => {
