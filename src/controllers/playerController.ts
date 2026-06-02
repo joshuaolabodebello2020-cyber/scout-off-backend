@@ -1,5 +1,6 @@
 import { sanitizeInput } from '../utils/sanitizer';
 import { z } from 'zod';
+import { CID_REGEX } from '../utils/cidValidator';
 import { pinJson, gatewayUrl } from '../services/ipfs';
 import { getEvents } from '../services/indexer';
 import { invalidatePlayerCache } from '../services/cache';

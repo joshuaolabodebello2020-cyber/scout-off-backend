@@ -5,10 +5,12 @@ import { getEvents } from '../services/indexer';
 import { invalidateMilestoneCache } from '../services/cache';
 import { PlayerMilestone } from '../types';
 
+import { CID_REGEX } from '../utils/cidValidator';
+
 export const milestoneSchema = z.object({
   playerId: z.string().min(1),
   milestoneType: z.enum(['identity', 'performance', 'trial_offer']),
-  evidenceUri: z.string().min(1),
+  evidenceUri: z.string().regex(CID_REGEX, 'evidenceUri must be a valid IPFS CID'),
 });
 
 export const pendingQuerySchema = z.object({
