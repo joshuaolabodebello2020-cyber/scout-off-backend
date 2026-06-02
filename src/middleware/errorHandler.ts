@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { ApiResponse } from '../types';
+import { logger } from '../utils/logger';
 
 export function errorHandler(
   err: Error,
@@ -8,32 +9,24 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  const correlationId = req.correlationId;
+  const correlationId: string | undefined = (req as any).correlationId;
 
-  if (err instanceof SyntaxError && 'status' in err && err.status === 400 && 'body' in err) {
-    const body: ApiResponse = { 
-      success: false, 
-      error: 'Malformed JSON payload',
-      correlationId 
-    };
-    res.status(400).json(body);
-    return;
-  }
+  logger.error(`[error] ${err.message}${correlationId ? ` correlationId=${correlationId}` : ''}`);
 
   if (err instanceof ZodError) {
-    const body: ApiResponse = { 
-      success: false, 
+    const body: ApiResponse & { correlationId?: string } = {
+      success: false,
       error: err.errors[0]?.message ?? 'Validation error',
-      correlationId 
+      ...(correlationId !== undefined && { correlationId }),
     };
     res.status(400).json(body);
     return;
   }
 
-  const body: ApiResponse = { 
-    success: false, 
+  const body: ApiResponse & { correlationId?: string } = {
+    success: false,
     error: err.message,
-    correlationId 
+    ...(correlationId !== undefined && { correlationId }),
   };
   res.status(500).json(body);
 }
