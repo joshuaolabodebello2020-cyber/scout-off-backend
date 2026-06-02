@@ -26,7 +26,7 @@ router.get('/stats', requireRole('admin'), getStats);
  * @response 400 { success: false, error: string } - Invalid date range
  * @auth Bearer (any authenticated user)
  */
-router.get('/events', requireAuth, validateQuery(adminDateRangeSchema), getAllEvents);
+router.get('/events', requireRole('admin'), getAllEvents);
 
 /**
  * GET /api/admin/fees
@@ -35,10 +35,9 @@ router.get('/events', requireAuth, validateQuery(adminDateRangeSchema), getAllEv
  * Query params: startDate, endDate (ISO 8601)
  *
  * @response 200 { success: true, data: FeeHistoryItem[] }
- * @response 400 { success: false, error: string } - Invalid date range
- * @auth Bearer (any authenticated user)
+ * @auth Bearer (admin role required)
  */
-router.get('/fees', requireAuth, validateQuery(adminDateRangeSchema), getFeeSummary);
+router.get('/fees', requireRole('admin'), getFeeSummary);
 
 /**
  * POST /api/admin/validators/register
