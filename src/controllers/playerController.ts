@@ -3,6 +3,7 @@ import { sanitizeInput } from '../utils/sanitizer';
 import { z } from 'zod';
 import { CID_REGEX } from '../utils/cidValidator';
 import { pinJson, gatewayUrl } from '../services/ipfs';
+import { serializeIpfsResult } from '../utils/ipfsSerializer';
 import { getEvents } from '../services/indexer';
 import { queryMilestones } from '../services/stellar';
 import { invalidatePlayerCache } from '../services/cache';
@@ -63,9 +64,14 @@ export async function registerPlayer(req: Request, res: Response, next: NextFunc
       metadataUri,
     });
 
-    const body: ApiResponse<{ metadataUri: string; gatewayUrl: string }> = {
+    const ipfsResult = serializeIpfsResult(metadataUri, {
+      wallet: parsed.wallet,
+      position: sanitizedPosition,
+      region: sanitizedRegion,
+    });
+    const body: ApiResponse<typeof ipfsResult & { metadataUri: string }> = {
       success: true,
-      data: { metadataUri, gatewayUrl: gatewayUrl(metadataUri) },
+      data: { ...ipfsResult, metadataUri },
     };
     res.status(201).json(body);
   } catch (err) {
