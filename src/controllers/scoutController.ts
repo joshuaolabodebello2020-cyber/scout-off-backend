@@ -45,7 +45,6 @@ export async function getSubscription(req: Request, res: Response, next: NextFun
 }
 
 /** GET /api/scouts/:wallet/contacts */
-/** GET /api/scouts/:wallet/contacts */
 export async function getUnlockedContacts(req: Request, res: Response, next: NextFunction) {
   try {
     const { wallet } = req.params;

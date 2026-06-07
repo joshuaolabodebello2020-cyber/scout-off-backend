@@ -14,8 +14,6 @@ import { normalizePosition } from '../utils/positionAliases';
 import { dispatchEventWebhook } from '../services/webhooks';
 import { enrichPlayerResult } from '../utils/searchEnrichment';
 
-const CID_REGEX = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
-
 const baseRegistrationSchema = z.object({
   wallet: z.string().min(56).max(56),
   position: z.string().min(1),

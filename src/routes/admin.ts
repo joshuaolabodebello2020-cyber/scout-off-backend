@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getStats, getAllEvents, getFeeSummary, registerValidator, revokeValidator, pauseContract, unpauseContract, adminDateRangeSchema } from '../controllers/adminController';
 import { introspectToken } from '../controllers/adminController';
+import { exportEvents } from '../controllers/exportController';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { validateQuery } from '../middleware/validate';
 
@@ -27,6 +28,19 @@ router.get('/stats', requireRole('admin'), getStats);
  * @auth Bearer (any authenticated user)
  */
 router.get('/events', requireRole('admin'), getAllEvents);
+
+/**
+ * GET /api/admin/events/export
+ *
+ * Exports all indexed Soroban contract events as CSV format.
+ * Useful for data analysis, reporting, and external system integration.
+ *
+ * @response 200 CSV file with columns: event_type, ledger, timestamp, payload
+ * @response 401 { success: false, error: string } - Missing token
+ * @response 403 { success: false, error: string } - Non-admin role
+ * @auth Bearer (admin role required)
+ */
+router.get('/events/export', requireRole('admin'), exportEvents);
 
 /**
  * GET /api/admin/fees
