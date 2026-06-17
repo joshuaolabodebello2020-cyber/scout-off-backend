@@ -82,14 +82,13 @@ export function verifyAndIssueToken(xdr: string, role?: string): { token: string
     throw new Error('Invalid challenge: wrong operation name');
   }
 
-  // 3. Verify the nonce value is present and properly formatted (64-byte base64)
+  // 3. Verify the nonce value is present and properly formatted (64 bytes)
   if (!manageDataOp.value) {
     throw new Error('Invalid challenge: missing nonce value');
   }
 
-  const nonceBase64 = manageDataOp.value.toString('base64');
-  // A 64-byte value in base64 encodes to 88 characters (64 * 4/3)
-  if (nonceBase64.length !== 88) {
+  // Validate the nonce is exactly 64 bytes by checking the raw buffer length
+  if (manageDataOp.value.length !== 64) {
     throw new Error('Invalid challenge: nonce must be exactly 64 bytes');
   }
 
