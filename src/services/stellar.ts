@@ -142,6 +142,37 @@ export async function withdrawFees(recipient: string): Promise<FeeWithdrawalResu
   throw new FeeWithdrawalError('No fees available to withdraw', 'NO_FEES');
 }
 
+export type SubscriptionTier = 'basic' | 'premium';
+
+export interface SubscriptionResult {
+  transactionId: string;
+  tier: SubscriptionTier;
+  expiresAt: number; // Unix timestamp
+  status: 'active';
+}
+
+/**
+ * Stub: invoke subscribe(scout, tier, duration) on the Soroban contract.
+ * Throws PaymentError with code 'INSUFFICIENT_FUNDS' for error code 7 (InsufficientFee).
+ */
+export async function purchaseSubscription(
+  scoutWallet: string,
+  tier: SubscriptionTier,
+  duration: number,
+): Promise<SubscriptionResult> {
+  if (!scoutWallet) {
+    throw new PaymentError('Missing scoutWallet', 'INVALID_ACCOUNT');
+  }
+  // TODO: build and submit subscribe Soroban transaction
+  const expiresAt = Math.floor(Date.now() / 1000) + duration * 86400;
+  return {
+    transactionId: `stub-sub-txid-${Date.now()}`,
+    tier,
+    expiresAt,
+    status: 'active',
+  };
+}
+
 /**
  * Stub: query verified milestones for a player from the Soroban contract.
  *

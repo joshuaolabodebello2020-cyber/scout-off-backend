@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getSubscription, getUnlockedContacts, unlockContact, getPaymentHistory } from '../controllers/scoutController';
-import { requireAuth } from '../middleware/auth';
+import { getSubscription, getUnlockedContacts, unlockContact, getPaymentHistory, subscribe } from '../controllers/scoutController';
+import { requireAuth, requireRole } from '../middleware/auth';
 
 const router = Router();
 
@@ -15,6 +15,22 @@ const router = Router();
  * @auth Bearer (any authenticated user)
  */
 router.get('/:wallet/subscription', requireAuth, getSubscription);
+
+/**
+ * POST /api/scouts/:wallet/subscribe
+ *
+ * Purchase a scout subscription by invoking subscribe(scout, tier, duration) on-chain.
+ *
+ * @param wallet {string} - Scout's Stellar public key
+ * @body { tier: 'basic' | 'premium', duration: number (1–365 days) }
+ * @response 201 { success: true, data: { transactionId, tier, expiresAt, status } }
+ * @response 400 { success: false, error: string } - Invalid tier or duration
+ * @response 401 { success: false, error: string } - Missing or invalid token
+ * @response 402 { success: false, error: string } - Insufficient XLM balance
+ * @response 403 { success: false, error: string } - Scout role required
+ * @auth Bearer (scout role required)
+ */
+router.post('/:wallet/subscribe', requireRole('scout'), subscribe);
 
 /**
  * GET /api/scouts/:wallet/contacts

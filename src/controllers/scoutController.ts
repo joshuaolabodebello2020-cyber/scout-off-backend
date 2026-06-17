@@ -1,8 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { getEvents } from '../services/indexer';
-import { submitContactPayment, isSubscribed, PaymentError } from '../services/stellar';
+import { submitContactPayment, isSubscribed, purchaseSubscription, PaymentError } from '../services/stellar';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
+
+const subscribeSchema = z.object({
+  tier: z.enum(['basic', 'premium']),
+  duration: z.number().int().min(1).max(365),
+});
 
 /** GET /api/scouts/:wallet/subscription */
 export async function getSubscription(req: Request, res: Response, next: NextFunction) {
@@ -97,6 +103,28 @@ export async function unlockContact(req: Request, res: Response, next: NextFunct
   } catch (err) {
     if (err instanceof PaymentError) {
       res.status(402).json({ success: false, error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+}
+
+/** POST /api/scouts/:wallet/subscribe */
+export async function subscribe(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { wallet } = req.params;
+    const parsed = subscribeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ success: false, error: parsed.error.errors[0]?.message ?? 'Invalid request' });
+      return;
+    }
+    const { tier, duration } = parsed.data;
+    const result = await purchaseSubscription(wallet, tier, duration);
+    res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    if (err instanceof PaymentError) {
+      const status = err.code === 'INSUFFICIENT_FUNDS' ? 402 : 400;
+      res.status(status).json({ success: false, error: err.message, code: err.code });
       return;
     }
     next(err);
