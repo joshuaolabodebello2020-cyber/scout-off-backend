@@ -1,9 +1,12 @@
 import app from './app';
 import config from './config';
 import { logger } from './utils/logger';
+import { initDb } from './db';
 import { stellarHealth } from './services/stellar';
 import { checkHealth } from './services/ipfs';
 import { indexEvents } from './services/indexer';
+
+initDb();
 
 app.listen(config.port, () => {
   logger.info(`ScoutOff backend running on port ${config.port} [${config.network}]`);
