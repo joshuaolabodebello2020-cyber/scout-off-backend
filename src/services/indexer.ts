@@ -1,6 +1,6 @@
 import { server } from './stellar';
 import config from '../config';
-import { getDb, getLastLedger, setLastLedger } from '../db';
+import { getDb, getLastLedger, setLastLedger, upsertPlayer, updatePlayerProgress } from '../db';
 
 // ─── Deduplication strategy ───────────────────────────────────────────────────
 //
@@ -52,15 +52,27 @@ export async function indexEvents(): Promise<void> {
 
   const insertMany = db.transaction((events: typeof response.events) => {
     for (const raw of events) {
+      const type = raw.topic[0]?.value() as string;
+      const payload = (raw.value?.value() as unknown as Record<string, unknown>) ?? {};
       const eventId = normalizeEventId(config.contractId, raw.ledger, raw.txHash);
       onBeforeInsert(eventId);
-      insert.run(
-        raw.topic[0]?.value() as string,
-        raw.ledger,
-        raw.txHash,
-        JSON.stringify(raw.value?.value() ?? {})
-      );
+      insert.run(type, raw.ledger, raw.txHash, JSON.stringify(payload));
       onAfterInsert(eventId);
+
+      if (type === 'player_registered') {
+        upsertPlayer({
+          player_id: payload.player_id as string,
+          wallet: payload.wallet as string,
+          position: payload.position as string | undefined,
+          region: payload.region as string | undefined,
+          metadata_uri: payload.metadataUri as string | undefined,
+          created_at: raw.ledger,
+        });
+      } else if (type === 'milestone_approved') {
+        const playerId = payload.player_id as string;
+        const level = Number(payload.progress_level ?? 0);
+        if (playerId) updatePlayerProgress(playerId, level);
+      }
     }
   });
 

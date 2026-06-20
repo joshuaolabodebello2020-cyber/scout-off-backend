@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CID_REGEX } from '../utils/cidValidator';
 import { pinJson } from '../services/ipfs';
 import { serializeIpfsResult } from '../utils/ipfsSerializer';
-import { getEvents } from '../db';
+import { getEvents, getPlayerById, queryPlayers } from '../db';
 import { queryMilestones } from '../services/stellar';
 import { invalidatePlayerCache } from '../services/cache';
 import { ApiResponse } from '../types';
@@ -81,17 +81,26 @@ export async function registerPlayer(req: Request, res: Response, next: NextFunc
 export async function getPlayer(req: Request, res: Response, next: NextFunction) {
   try {
     const playerId = sanitizeInput(req.params.playerId);
-    const events = getEvents('player_registered').filter(
-      (e) => e.payload.player_id === playerId
-    );
-    if (!events.length) {
+    const row = getPlayerById(playerId);
+    if (!row) {
       res.status(404).json({ success: false, error: 'Player not found' });
       return;
     }
-    const payload = events[0].payload;
-    const level = Number(payload.progress_level ?? 0);
-    const { tierName, tierDescription } = getTierMeta(level);
-    res.json({ success: true, data: { ...payload, tierName, tierDescription } });
+    const { tierName, tierDescription } = getTierMeta(row.progress_level);
+    res.json({
+      success: true,
+      data: {
+        player_id: row.player_id,
+        wallet: row.wallet,
+        position: row.position,
+        region: row.region,
+        metadataUri: row.metadata_uri,
+        progress_level: row.progress_level,
+        created_at: row.created_at,
+        tierName,
+        tierDescription,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -111,20 +120,24 @@ export async function filterPlayers(req: Request, res: Response, next: NextFunct
     const sanitizedPosition = position ? sanitizeInput(position) : undefined;
     const normalizedPosition = sanitizedPosition ? normalizePosition(sanitizedPosition) : undefined;
 
-    let players = getEvents('player_registered').map((e) => e.payload);
-    if (sanitizedRegion) players = players.filter((p) => p.region === sanitizedRegion);
-    if (normalizedPosition || sanitizedPosition) {
-      const match = normalizedPosition ?? sanitizedPosition;
-      players = players.filter((p) => p.position === match);
-    }
-    if (minTier !== undefined)
-      players = players.filter((p) => Number(p.progress_level) >= minTier);
-    const total = players.length;
+    const rows = queryPlayers({
+      region: sanitizedRegion,
+      position: normalizedPosition ?? sanitizedPosition,
+      minTier,
+    });
+
+    const total = rows.length;
     const pages = Math.ceil(total / pageSize);
-    const paginated = players.slice((page - 1) * pageSize, page * pageSize);
-    const enriched = paginated.map((p) => ({
-      ...p,
-      ...enrichPlayerResult(Number(p.progress_level ?? 0)),
+    const paginated = rows.slice((page - 1) * pageSize, page * pageSize);
+    const enriched = paginated.map((row) => ({
+      player_id: row.player_id,
+      wallet: row.wallet,
+      position: row.position,
+      region: row.region,
+      metadataUri: row.metadata_uri,
+      progress_level: row.progress_level,
+      created_at: row.created_at,
+      ...enrichPlayerResult(row.progress_level),
     }));
     res.json({ success: true, data: enriched, total, page, pageSize, pages });
   } catch (err) {

@@ -20,6 +20,25 @@ class Statement {
     } else if (sql.startsWith('INSERT INTO INDEXER_STATE') || sql.startsWith('INSERT OR REPLACE INTO INDEXER_STATE')) {
       const [key, value] = args;
       this._db._state.set(key, value);
+    } else if (sql.startsWith('INSERT INTO PLAYERS')) {
+      const [player_id, wallet, position, region, metadata_uri, created_at] = args;
+      const existing = this._db._players.findIndex((p) => p.player_id === player_id);
+      if (existing >= 0) {
+        // ON CONFLICT DO UPDATE — update mutable fields
+        this._db._players[existing] = {
+          ...this._db._players[existing],
+          wallet,
+          position,
+          region,
+          metadata_uri,
+        };
+      } else {
+        this._db._players.push({ player_id, wallet, position, region, metadata_uri, progress_level: 0, created_at });
+      }
+    } else if (sql.startsWith('UPDATE PLAYERS SET PROGRESS_LEVEL')) {
+      const [level, player_id] = args;
+      const idx = this._db._players.findIndex((p) => p.player_id === player_id);
+      if (idx >= 0) this._db._players[idx].progress_level = level;
     }
     return { changes: 1, lastInsertRowid: 0 };
   }
@@ -30,6 +49,9 @@ class Statement {
       const key = args[0];
       const value = this._db._state.get(key);
       return value !== undefined ? { value } : undefined;
+    }
+    if (sql.includes('FROM PLAYERS') && sql.includes('WHERE PLAYER_ID = ?')) {
+      return this._db._players.find((p) => p.player_id === args[0]) ?? undefined;
     }
     return undefined;
   }
@@ -42,6 +64,22 @@ class Statement {
       }
       return [...this._db._events];
     }
+    if (sql.includes('FROM PLAYERS')) {
+      let rows = [...this._db._players];
+      // Parse WHERE conditions from remaining args in order
+      const whereMatch = sql.match(/WHERE (.+?)(?:ORDER|$)/);
+      if (whereMatch) {
+        const conditions = whereMatch[1].split(' AND ');
+        let argIdx = 0;
+        for (const cond of conditions) {
+          const val = args[argIdx++];
+          if (cond.includes('REGION = ?')) rows = rows.filter((r) => r.region === val);
+          else if (cond.includes('POSITION = ?')) rows = rows.filter((r) => r.position === val);
+          else if (cond.includes('PROGRESS_LEVEL >= ?')) rows = rows.filter((r) => r.progress_level >= val);
+        }
+      }
+      return rows;
+    }
     return [];
   }
 }
@@ -50,6 +88,7 @@ class Database {
   constructor(_path) {
     this._events = [];
     this._state = new Map();
+    this._players = [];
   }
 
   exec(_sql) {
