@@ -9,6 +9,8 @@ pub enum Error {
     PlayerNotFound = 3,
     NotFound = 4,
     InvalidInput = 5,
+    InsufficientFee = 7,
     Unauthorized = 9,
     ContractPaused = 10,
+    Overflow = 11,
 }
