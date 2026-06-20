@@ -25,6 +25,18 @@ export function initDb(): void {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS players (
+      player_id      TEXT    PRIMARY KEY,
+      wallet         TEXT    NOT NULL,
+      position       TEXT,
+      region         TEXT,
+      metadata_uri   TEXT,
+      progress_level INTEGER DEFAULT 0,
+      created_at     INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_players_region   ON players (region);
+    CREATE INDEX IF NOT EXISTS idx_players_position ON players (position);
+    CREATE INDEX IF NOT EXISTS idx_players_tier     ON players (progress_level);
   `);
 }
 
@@ -67,4 +79,80 @@ export function getEvents(type?: ContractEventType): EventRecord[] {
     payload: JSON.parse(r.payload),
     contractAddress: config.contractId,
   }));
+}
+
+// ─── Player table helpers ─────────────────────────────────────────────────────
+
+export interface PlayerRow {
+  player_id: string;
+  wallet: string;
+  position: string | null;
+  region: string | null;
+  metadata_uri: string | null;
+  progress_level: number;
+  created_at: number | null;
+}
+
+export interface QueryPlayersOptions {
+  region?: string;
+  position?: string;
+  minTier?: number;
+}
+
+export function upsertPlayer(p: {
+  player_id: string;
+  wallet: string;
+  position?: string;
+  region?: string;
+  metadata_uri?: string;
+  created_at?: number;
+}): void {
+  getDb()
+    .prepare(
+      `INSERT INTO players (player_id, wallet, position, region, metadata_uri, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(player_id) DO UPDATE SET
+         wallet       = excluded.wallet,
+         position     = excluded.position,
+         region       = excluded.region,
+         metadata_uri = excluded.metadata_uri`
+    )
+    .run(p.player_id, p.wallet, p.position ?? null, p.region ?? null, p.metadata_uri ?? null, p.created_at ?? null);
+}
+
+export function updatePlayerProgress(playerId: string, level: number): void {
+  getDb()
+    .prepare('UPDATE players SET progress_level = ? WHERE player_id = ?')
+    .run(level, playerId);
+}
+
+export function getPlayerById(playerId: string): PlayerRow | null {
+  return (
+    getDb()
+      .prepare('SELECT * FROM players WHERE player_id = ?')
+      .get(playerId) as PlayerRow | undefined
+  ) ?? null;
+}
+
+export function queryPlayers(opts: QueryPlayersOptions = {}): PlayerRow[] {
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+
+  if (opts.region) {
+    conditions.push('region = ?');
+    params.push(opts.region);
+  }
+  if (opts.position) {
+    conditions.push('position = ?');
+    params.push(opts.position);
+  }
+  if (opts.minTier !== undefined) {
+    conditions.push('progress_level >= ?');
+    params.push(opts.minTier);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return getDb()
+    .prepare(`SELECT * FROM players ${where} ORDER BY created_at ASC`)
+    .all(...params) as PlayerRow[];
 }

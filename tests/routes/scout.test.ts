@@ -30,6 +30,13 @@ function makeToken(wallet: string, role = 'scout'): string {
   return jwt.sign({ sub: wallet, role }, SECRET, { expiresIn: '1h' });
 }
 
+function makePlayerToken(wallet: string): string {
+  return makeToken(wallet, 'player');
+}
+function makeValidatorToken(wallet: string): string {
+  return makeToken(wallet, 'validator');
+}
+
 const WALLET = 'GSCOUTWALLET1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const OTHER  = 'GOTHERWALLET2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
@@ -220,5 +227,45 @@ describe('POST /api/scouts/:wallet/contacts/:playerId/unlock', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(mockSubmitContactPayment).toHaveBeenCalledWith(WALLET, PLAYER_ID);
+  });
+});
+
+// ─── Role enforcement — non-scout JWTs must be rejected ──────────────────────
+
+describe('Scout route role enforcement', () => {
+  it('returns 403 when player JWT calls GET subscription', async () => {
+    const token = makePlayerToken(WALLET);
+    const res = await request(app)
+      .get(`/api/scouts/${WALLET}/subscription`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 403 when validator JWT calls GET subscription', async () => {
+    const token = makeValidatorToken(WALLET);
+    const res = await request(app)
+      .get(`/api/scouts/${WALLET}/subscription`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 403 when player JWT calls GET contacts', async () => {
+    const token = makePlayerToken(WALLET);
+    const res = await request(app)
+      .get(`/api/scouts/${WALLET}/contacts`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 403 when player JWT calls POST unlock', async () => {
+    const token = makePlayerToken(WALLET);
+    const res = await request(app)
+      .post(`/api/scouts/${WALLET}/contacts/player-1/unlock`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
   });
 });
