@@ -31,6 +31,7 @@ function makeToken(wallet: string, role: string): string {
 const VALIDATOR_WALLET = 'GVALIDATOR1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const PLAYER_WALLET = 'GPLAYER1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const SCOUT_WALLET = 'GSCOUT1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+const ADMIN_WALLET = 'GADMIN1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
 beforeEach(() => {
   mockGetEvents.mockReset();
@@ -67,6 +68,17 @@ describe('POST /api/validators/milestone', () => {
     const res = await request(app)
       .post('/api/validators/milestone')
       .set('Authorization', `Bearer ${scoutToken}`)
+      .send(validPayload);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBe('Insufficient permissions');
+  });
+
+  it('returns 403 when user is an admin', async () => {
+    const adminToken = makeToken(ADMIN_WALLET, 'admin');
+    const res = await request(app)
+      .post('/api/validators/milestone')
+      .set('Authorization', `Bearer ${adminToken}`)
       .send(validPayload);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
@@ -118,6 +130,16 @@ describe('GET /api/validators/milestones/pending', () => {
     const res = await request(app)
       .get('/api/validators/milestones/pending')
       .set('Authorization', `Bearer ${scoutToken}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBe('Insufficient permissions');
+  });
+
+  it('returns 403 when user is an admin', async () => {
+    const adminToken = makeToken(ADMIN_WALLET, 'admin');
+    const res = await request(app)
+      .get('/api/validators/milestones/pending')
+      .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
     expect(res.body.error).toBe('Insufficient permissions');
