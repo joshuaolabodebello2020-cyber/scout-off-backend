@@ -34,6 +34,13 @@ function makeToken(wallet: string, role = 'scout'): string {
   return jwt.sign({ sub: wallet, role }, SECRET, { expiresIn: '1h' });
 }
 
+function makePlayerToken(wallet: string): string {
+  return makeToken(wallet, 'player');
+}
+function makeValidatorToken(wallet: string): string {
+  return makeToken(wallet, 'validator');
+}
+
 const WALLET = 'GSCOUTWALLET1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const OTHER  = 'GOTHERWALLET2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
@@ -76,7 +83,7 @@ describe('GET /api/scouts/:wallet/subscription', () => {
         source: 'contract',
         type: 'scout_subscribed',
         contractAddress: 'contract',
-        payload: { scout: WALLET, subscriptionExpiry: expiresAt, tier: 'pro' },
+        payload: { scout: WALLET, subscription_expiry: expiresAt, tier: 'pro' },
       },
     ]);
     const token = makeToken(WALLET);
@@ -98,7 +105,7 @@ describe('GET /api/scouts/:wallet/subscription', () => {
         source: 'contract',
         type: 'scout_subscribed',
         contractAddress: 'contract',
-        payload: { scout: WALLET, subscriptionExpiry: expiresAt },
+        payload: { scout: WALLET, subscription_expiry: expiresAt },
       },
     ]);
     const token = makeToken(WALLET);
@@ -117,7 +124,7 @@ describe('GET /api/scouts/:wallet/subscription', () => {
         source: 'contract',
         type: 'scout_subscribed',
         contractAddress: 'contract',
-        payload: { scout: WALLET, subscriptionExpiry: expiresAt },
+        payload: { scout: WALLET, subscription_expiry: expiresAt },
       },
     ]);
     const token = makeToken(WALLET);
@@ -164,13 +171,13 @@ describe('GET /api/scouts/:wallet/contacts', () => {
         source: 'contract',
         type: 'contact_unlocked',
         contractAddress: 'contract',
-        payload: { scout: WALLET, playerId: 'player-42', unlockedAt },
+        payload: { scout: WALLET, player_id: 'player-42', unlocked_at: unlockedAt },
       },
       {
         source: 'contract',
         type: 'contact_unlocked',
         contractAddress: 'contract',
-        payload: { scout: WALLET, playerId: 'player-99', unlockedAt: unlockedAt + 100 },
+        payload: { scout: WALLET, player_id: 'player-99', unlocked_at: unlockedAt + 100 },
       },
     ]);
     const token = makeToken(WALLET);
@@ -313,5 +320,44 @@ describe('POST /api/scouts/:wallet/subscribe', () => {
     expect(res.status).toBe(402);
     expect(res.body.success).toBe(false);
     expect(res.body.code).toBe('INSUFFICIENT_FUNDS');
+  });
+});
+// ─── Role enforcement — non-scout JWTs must be rejected ──────────────────────
+
+describe('Scout route role enforcement', () => {
+  it('returns 403 when player JWT calls GET subscription', async () => {
+    const token = makePlayerToken(WALLET);
+    const res = await request(app)
+      .get(`/api/scouts/${WALLET}/subscription`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 403 when validator JWT calls GET subscription', async () => {
+    const token = makeValidatorToken(WALLET);
+    const res = await request(app)
+      .get(`/api/scouts/${WALLET}/subscription`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 403 when player JWT calls GET contacts', async () => {
+    const token = makePlayerToken(WALLET);
+    const res = await request(app)
+      .get(`/api/scouts/${WALLET}/contacts`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 403 when player JWT calls POST unlock', async () => {
+    const token = makePlayerToken(WALLET);
+    const res = await request(app)
+      .post(`/api/scouts/${WALLET}/contacts/player-1/unlock`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
   });
 });
