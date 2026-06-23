@@ -1,14 +1,6 @@
 import { Router } from 'express';
-import {
-  getSubscription,
-  getUnlockedContacts,
-  unlockContact,
-  getPaymentHistory,
-  submitTrialOffer,
-  trialOfferSchema,
-} from '../controllers/scoutController';
-import { requireAuth, requireRole } from '../middleware/auth';
-import { validateBody } from '../middleware/validate';
+import { getSubscription, getUnlockedContacts, unlockContact, getPaymentHistory } from '../controllers/scoutController';
+import { requireRole } from '../middleware/auth';
 
 const router = Router();
 
@@ -22,7 +14,7 @@ const router = Router();
  * @response 401 { success: false, error: string } - Missing or invalid token
  * @auth Bearer (any authenticated user)
  */
-router.get('/:wallet/subscription', requireAuth, getSubscription);
+router.get('/:wallet/subscription', requireRole('scout'), getSubscription);
 
 /**
  * GET /api/scouts/:wallet/contacts
@@ -34,7 +26,7 @@ router.get('/:wallet/subscription', requireAuth, getSubscription);
  * @response 401 { success: false, error: string } - Missing or invalid token
  * @auth Bearer (any authenticated user)
  */
-router.get('/:wallet/contacts', requireAuth, getUnlockedContacts);
+router.get('/:wallet/contacts', requireRole('scout'), getUnlockedContacts);
 
 /**
  * POST /api/scouts/:wallet/contacts/:playerId/unlock
@@ -48,8 +40,8 @@ router.get('/:wallet/contacts', requireAuth, getUnlockedContacts);
  * @response 401 { success: false, error: string } - Missing or invalid token
  * @auth Bearer (any authenticated user)
  */
-router.post('/:wallet/contacts/:playerId/unlock', requireAuth, unlockContact);
-router.get('/:wallet/payments', requireAuth, getPaymentHistory);
+router.post('/:wallet/contacts/:playerId/unlock', requireRole('scout'), unlockContact);
+router.get('/:wallet/payments', requireRole('scout'), getPaymentHistory);
 
 /**
  * POST /api/scouts/:wallet/trial-offer

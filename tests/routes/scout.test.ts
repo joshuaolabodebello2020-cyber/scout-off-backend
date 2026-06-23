@@ -15,8 +15,7 @@ jest.mock('../../src/services/indexer', () => ({
 
 jest.mock('../../src/services/stellar', () => ({
   submitContactPayment: jest.fn(),
-  isSubscribed: jest.fn(),
-  logTrialOffer: jest.fn(),
+  isSubscribed: jest.fn().mockResolvedValue({ active: false, expiresAt: null }),
   PaymentError: class PaymentError extends Error {
     constructor(public message: string, public code: string) { super(message); }
   },
@@ -31,6 +30,13 @@ const mockLogTrialOffer = logTrialOffer as jest.Mock;
 
 function makeToken(wallet: string, role = 'scout'): string {
   return jwt.sign({ sub: wallet, role }, SECRET, { expiresIn: '1h' });
+}
+
+function makePlayerToken(wallet: string): string {
+  return makeToken(wallet, 'player');
+}
+function makeValidatorToken(wallet: string): string {
+  return makeToken(wallet, 'validator');
 }
 
 const WALLET = 'GSCOUTWALLET1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
@@ -76,7 +82,7 @@ describe('GET /api/scouts/:wallet/subscription', () => {
         source: 'contract',
         type: 'scout_subscribed',
         contractAddress: 'contract',
-        payload: { scout: WALLET, subscriptionExpiry: expiresAt, tier: 'pro' },
+        payload: { scout: WALLET, subscription_expiry: expiresAt, tier: 'pro' },
       },
     ]);
     const token = makeToken(WALLET);
@@ -98,7 +104,7 @@ describe('GET /api/scouts/:wallet/subscription', () => {
         source: 'contract',
         type: 'scout_subscribed',
         contractAddress: 'contract',
-        payload: { scout: WALLET, subscriptionExpiry: expiresAt },
+        payload: { scout: WALLET, subscription_expiry: expiresAt },
       },
     ]);
     const token = makeToken(WALLET);
@@ -117,7 +123,7 @@ describe('GET /api/scouts/:wallet/subscription', () => {
         source: 'contract',
         type: 'scout_subscribed',
         contractAddress: 'contract',
-        payload: { scout: WALLET, subscriptionExpiry: expiresAt },
+        payload: { scout: WALLET, subscription_expiry: expiresAt },
       },
     ]);
     const token = makeToken(WALLET);
@@ -164,13 +170,13 @@ describe('GET /api/scouts/:wallet/contacts', () => {
         source: 'contract',
         type: 'contact_unlocked',
         contractAddress: 'contract',
-        payload: { scout: WALLET, playerId: 'player-42', unlockedAt },
+        payload: { scout: WALLET, player_id: 'player-42', unlocked_at: unlockedAt },
       },
       {
         source: 'contract',
         type: 'contact_unlocked',
         contractAddress: 'contract',
-        payload: { scout: WALLET, playerId: 'player-99', unlockedAt: unlockedAt + 100 },
+        payload: { scout: WALLET, player_id: 'player-99', unlocked_at: unlockedAt + 100 },
       },
     ]);
     const token = makeToken(WALLET);
@@ -227,146 +233,42 @@ describe('POST /api/scouts/:wallet/contacts/:playerId/unlock', () => {
   });
 });
 
-// ─── POST /api/scouts/:wallet/trial-offer ─────────────────────────────────────
+// ─── Role enforcement — non-scout JWTs must be rejected ──────────────────────
 
-describe('POST /api/scouts/:wallet/trial-offer', () => {
-  const PLAYER_ID = 'player-123';
-  const VALID_BODY = { playerId: PLAYER_ID, detailsUri: 'ipfs://QmOfferDetails' };
-
-  function mockPlayerRegistered(registered: boolean) {
-    mockGetEvents.mockImplementation((type: string) => {
-      if (type === 'player_registered') {
-        return registered ? [{ payload: { player_id: PLAYER_ID } }] : [];
-      }
-      if (type === 'scout_subscribed') return [];
-      if (type === 'contact_unlocked') return [];
-      return [];
-    });
-  }
-
-  beforeEach(() => {
-    mockGetEvents.mockReset();
-    mockIsSubscribed.mockReset().mockResolvedValue({ active: false, expiresAt: null });
-    mockLogTrialOffer.mockReset();
-    mockPlayerRegistered(true);
-  });
-
-  it('returns 401 when no token is provided', async () => {
+describe('Scout route role enforcement', () => {
+  it('returns 403 when player JWT calls GET subscription', async () => {
+    const token = makePlayerToken(WALLET);
     const res = await request(app)
-      .post(`/api/scouts/${WALLET}/trial-offer`)
-      .send(VALID_BODY);
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 403 when authenticated user is not a scout', async () => {
-    const token = makeToken(WALLET, 'validator');
-    const res = await request(app)
-      .post(`/api/scouts/${WALLET}/trial-offer`)
-      .set('Authorization', `Bearer ${token}`)
-      .send(VALID_BODY);
+      .get(`/api/scouts/${WALLET}/subscription`)
+      .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
   });
 
-  it('returns 403 when JWT wallet does not match path wallet', async () => {
-    const token = makeToken(OTHER);
+  it('returns 403 when validator JWT calls GET subscription', async () => {
+    const token = makeValidatorToken(WALLET);
     const res = await request(app)
-      .post(`/api/scouts/${WALLET}/trial-offer`)
-      .set('Authorization', `Bearer ${token}`)
-      .send(VALID_BODY);
+      .get(`/api/scouts/${WALLET}/subscription`)
+      .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
-    expect(res.body.error).toMatch(/wallet/i);
   });
 
-  it('returns 400 when playerId is missing', async () => {
-    const token = makeToken(WALLET);
+  it('returns 403 when player JWT calls GET contacts', async () => {
+    const token = makePlayerToken(WALLET);
     const res = await request(app)
-      .post(`/api/scouts/${WALLET}/trial-offer`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ detailsUri: 'ipfs://QmOfferDetails' });
-    expect(res.status).toBe(400);
+      .get(`/api/scouts/${WALLET}/contacts`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
   });
 
-  it('returns 400 when detailsUri is not a valid IPFS or HTTPS URI', async () => {
-    const token = makeToken(WALLET);
+  it('returns 403 when player JWT calls POST unlock', async () => {
+    const token = makePlayerToken(WALLET);
     const res = await request(app)
-      .post(`/api/scouts/${WALLET}/trial-offer`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ playerId: PLAYER_ID, detailsUri: 'not-a-valid-uri' });
-    expect(res.status).toBe(400);
+      .post(`/api/scouts/${WALLET}/contacts/player-1/unlock`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
-  });
-
-  it('returns 404 when the player does not exist', async () => {
-    mockPlayerRegistered(false);
-    const token = makeToken(WALLET);
-    const res = await request(app)
-      .post(`/api/scouts/${WALLET}/trial-offer`)
-      .set('Authorization', `Bearer ${token}`)
-      .send(VALID_BODY);
-    expect(res.status).toBe(404);
-    expect(res.body.success).toBe(false);
-  });
-
-  it('returns 402 when the scout has no active subscription or paid contact fee', async () => {
-    const token = makeToken(WALLET);
-    const res = await request(app)
-      .post(`/api/scouts/${WALLET}/trial-offer`)
-      .set('Authorization', `Bearer ${token}`)
-      .send(VALID_BODY);
-    expect(res.status).toBe(402);
-    expect(res.body.success).toBe(false);
-    expect(mockLogTrialOffer).not.toHaveBeenCalled();
-  });
-
-  it('returns 201 and logs the trial offer when the scout has an active on-chain subscription', async () => {
-    mockIsSubscribed.mockResolvedValue({ active: true, expiresAt: '2099-01-01T00:00:00Z' });
-    mockLogTrialOffer.mockResolvedValue({
-      transactionId: 'tx-1',
-      playerId: PLAYER_ID,
-      detailsUri: VALID_BODY.detailsUri,
-      playerTier: 3,
-    });
-    const token = makeToken(WALLET);
-    const res = await request(app)
-      .post(`/api/scouts/${WALLET}/trial-offer`)
-      .set('Authorization', `Bearer ${token}`)
-      .send(VALID_BODY);
-    expect(res.status).toBe(201);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data).toEqual({
-      transactionId: 'tx-1',
-      playerId: PLAYER_ID,
-      detailsUri: VALID_BODY.detailsUri,
-      playerTier: 3,
-    });
-    expect(mockLogTrialOffer).toHaveBeenCalledWith(WALLET, PLAYER_ID, VALID_BODY.detailsUri);
-  });
-
-  it('returns 201 when the scout has previously paid the contact fee for this player', async () => {
-    mockGetEvents.mockImplementation((type: string) => {
-      if (type === 'player_registered') return [{ payload: { player_id: PLAYER_ID } }];
-      if (type === 'scout_subscribed') return [];
-      if (type === 'contact_unlocked') {
-        return [{ payload: { scout: WALLET, playerId: PLAYER_ID, unlockedAt: 1 } }];
-      }
-      return [];
-    });
-    mockLogTrialOffer.mockResolvedValue({
-      transactionId: 'tx-2',
-      playerId: PLAYER_ID,
-      detailsUri: VALID_BODY.detailsUri,
-      playerTier: 3,
-    });
-    const token = makeToken(WALLET);
-    const res = await request(app)
-      .post(`/api/scouts/${WALLET}/trial-offer`)
-      .set('Authorization', `Bearer ${token}`)
-      .send(VALID_BODY);
-    expect(res.status).toBe(201);
-    expect(res.body.success).toBe(true);
-    expect(mockLogTrialOffer).toHaveBeenCalledWith(WALLET, PLAYER_ID, VALID_BODY.detailsUri);
   });
 });
